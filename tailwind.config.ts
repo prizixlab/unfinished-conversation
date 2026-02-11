@@ -1,7 +1,10 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
+  content: [
+    './app/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+  ],
   theme: {
     extend: {
       colors: {
@@ -11,17 +14,18 @@ const config: Config = {
         border: '#223041',
         text: '#E5E7EB',
         muted: '#9CA3AF',
-        accent: '#D6B25E',
-        'accent-hover': '#E2C878',
-        'accent-text': '#0B0F14'
+
+        accent: '#E0B86A',
+        'accent-hover': '#F1D08A',
+        'accent-text': '#0B0F14',
       },
       boxShadow: {
-        glow: '0 0 18px rgba(214,178,94,0.35), 0 0 36px rgba(214,178,94,0.15)',
-        'glow-soft': '0 0 12px rgba(214,178,94,0.22)'
-      }
-    }
+        glow: '0 0 18px rgba(224,184,106,0.38), 0 0 36px rgba(224,184,106,0.26)',
+        'glow-soft': '0 0 12px rgba(224,184,106,0.22)',
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };
 
 export default config;

@@ -1,187 +1,106 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { franc } from 'franc-min';
-import langs from 'langs';
+import { useState } from 'react';
 
-const tones = ['warm', 'neutral', 'tense', 'grieving', 'conflicted'] as const;
-const outcomes = ['goodbye', 'forgiveness', 'understanding', 'letting go'] as const;
+export default function IntakeForm({ sessionId }: { sessionId: string }) {
+  const [senderName, setSenderName] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [message, setMessage] = useState('');
 
-type IntakeData = {
-  email: string;
-  personRole: string;
-  unfinishedSummary: string;
-  unsaidMessage: string;
-  relationshipTone: (typeof tones)[number];
-  desiredOutcome: (typeof outcomes)[number];
-};
-
-function labelForLanguage(code: string) {
-  if (code === 'und') return 'Unknown';
-  const language = langs.where('3', code);
-  return language?.name ?? 'Unknown';
-}
-
-export function IntakeForm({ sessionId }: { sessionId: string }) {
-  const [data, setData] = useState<IntakeData>({
-    email: '',
-    personRole: '',
-    unfinishedSummary: '',
-    unsaidMessage: '',
-    relationshipTone: 'neutral',
-    desiredOutcome: 'understanding'
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [ok, setOk] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const detectedLang = useMemo(() => {
-    if (!data.unsaidMessage.trim()) return null;
-    const langCode = franc(data.unsaidMessage, { minLength: 12 });
-    return labelForLanguage(langCode);
-  }, [data.unsaidMessage]);
-
-  const handleChange = (field: keyof IntakeData) =>
-    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      setData((prev) => ({ ...prev, [field]: event.target.value }));
-    };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmitting(true);
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
     setError(null);
+    setOk(false);
 
     try {
-      const res = await fetch('/api/request', {
+      const res = await fetch('/api/intake/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, sessionId })
+        body: JSON.stringify({
+          session_id: sessionId,
+          senderName,
+          recipientName,
+          recipientEmail,
+          message,
+        }),
       });
 
-      if (!res.ok) {
-        const message = await res.text();
-        throw new Error(message || 'Unable to submit');
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to submit.');
 
-      setSubmitted(true);
-    } catch (err) {
-      setError('We could not save your request. Please refresh and try again.');
+      setOk(true);
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  };
-
-  if (submitted) {
-    return (
-      <div className="space-y-4 rounded-3xl border border-border bg-surface px-6 py-6">
-        <h2 className="text-2xl font-semibold">Your response is underway.</h2>
-        <p className="text-muted">
-          Your reply will be prepared over the next few hours. When it’s ready, we’ll email you a private
-          link to view it.
-        </p>
-        <p className="text-muted">
-          If you don’t see the email, please check spam/promotions. You may also add{' '}
-          <span className="text-text">{process.env.NEXT_PUBLIC_FROM_EMAIL ?? 'our sender email'}</span>{' '}
-          to your contacts.
-        </p>
-      </div>
-    );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <label className="text-sm text-muted">Email</label>
-        <input
-          required
-          type="email"
-          value={data.email}
-          onChange={handleChange('email')}
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent"
-          placeholder="you@example.com"
-        />
-        <p className="text-xs text-muted">Used only to send your private link.</p>
-      </div>
+    <main className="mx-auto max-w-xl px-6 py-10 text-white">
+      <h1 className="text-2xl font-semibold">Write your message</h1>
+      <p className="mt-2 text-sm text-white/70">
+        Payment confirmed. Session: <span className="font-mono">{sessionId}</span>
+      </p>
 
-      <div className="space-y-2">
-        <label className="text-sm text-muted">Who is this person to you?</label>
-        <input
-          required
-          type="text"
-          value={data.personRole}
-          onChange={handleChange('personRole')}
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent"
-          placeholder="Friend, parent, partner…"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-sm text-muted">What feels unfinished?</label>
-        <input
-          required
-          type="text"
-          value={data.unfinishedSummary}
-          onChange={handleChange('unfinishedSummary')}
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent"
-          placeholder="The last call, the apology, the silence…"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-sm text-muted">Write in any language. We’ll respond in the same language.</label>
-        <textarea
-          required
-          value={data.unsaidMessage}
-          onChange={handleChange('unsaidMessage')}
-          rows={10}
-          className="textarea-glow w-full resize-none rounded-2xl border border-border bg-surface-2 px-4 py-4 text-sm text-text focus:outline-none"
-          placeholder="Type here — any language is welcome."
-        />
-        {data.unsaidMessage.trim() ? (
-          <p className="text-xs text-muted">Detected: {detectedLang ?? 'Unknown'}</p>
-        ) : null}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <label className="text-sm text-muted">Relationship tone</label>
-          <select
-            value={data.relationshipTone}
-            onChange={handleChange('relationshipTone')}
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            {tones.map((tone) => (
-              <option key={tone} value={tone}>
-                {tone}
-              </option>
-            ))}
-          </select>
+      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <div>
+          <label className="text-sm text-white/80">Your name</label>
+          <input
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2"
+            value={senderName}
+            onChange={(e) => setSenderName(e.target.value)}
+            required
+          />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm text-muted">Desired outcome</label>
-          <select
-            value={data.desiredOutcome}
-            onChange={handleChange('desiredOutcome')}
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            {outcomes.map((outcome) => (
-              <option key={outcome} value={outcome}>
-                {outcome}
-              </option>
-            ))}
-          </select>
+
+        <div>
+          <label className="text-sm text-white/80">Recipient name</label>
+          <input
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2"
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+          />
         </div>
-      </div>
 
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+        <div>
+          <label className="text-sm text-white/80">Recipient email</label>
+          <input
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2"
+            type="email"
+            value={recipientEmail}
+            onChange={(e) => setRecipientEmail(e.target.value)}
+            required
+          />
+        </div>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="glow-persistent inline-flex items-center justify-center rounded-full bg-accent px-7 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-accent-text transition disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {submitting ? 'Submitting…' : 'Submit for response'}
-      </button>
-    </form>
+        <div>
+          <label className="text-sm text-white/80">Message</label>
+          <textarea
+            className="mt-1 min-h-[160px] w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-full bg-white text-black px-5 py-3 font-semibold disabled:opacity-60"
+        >
+          {loading ? 'Submitting...' : 'Submit'}
+        </button>
+
+        {ok ? <p className="text-green-300 text-sm">✅ Submitted.</p> : null}
+        {error ? <p className="text-red-300 text-sm">❌ {error}</p> : null}
+      </form>
+    </main>
   );
 }
