@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 export default function IntakeForm({ sessionId }: { sessionId: string }) {
-  const [senderName, setSenderName] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
+  const [name, setName] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -25,11 +25,11 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: sessionId,
-          senderName,
-          recipientName,
-          recipientEmail,
+          sessionId,
+          name,
+          recipient,
           message,
+          email,
         }),
       });
 
@@ -67,8 +67,8 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
           <label className="text-sm text-white/80">Your name</label>
           <input
             className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
-            value={senderName}
-            onChange={(e) => setSenderName(e.target.value)}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             disabled={isLocked}
             required
           />
@@ -78,8 +78,8 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
           <label className="text-sm text-white/80">This message is for</label>
           <input
             className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
-            value={recipientName}
-            onChange={(e) => setRecipientName(e.target.value)}
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
             placeholder="A person / Someone I miss / Someone important"
             disabled={isLocked}
           />
@@ -103,8 +103,8 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
           <input
             className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
             type="email"
-            value={recipientEmail}
-            onChange={(e) => setRecipientEmail(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             disabled={isLocked}
             required
           />

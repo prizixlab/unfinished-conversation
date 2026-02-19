@@ -20,3 +20,14 @@ create table if not exists public.requests (
 );
 
 create index if not exists requests_status_created_at_idx on public.requests (status, created_at);
+
+create table if not exists public.intake_messages (
+  id uuid primary key default gen_random_uuid(),
+  stripe_session_id text,
+  name text,
+  recipient text,
+  message text,
+  email text,
+  status text default 'pending',
+  created_at timestamptz default now()
+);
