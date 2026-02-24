@@ -11,5 +11,5 @@ export default function IntakePage({
   const bypassSessionId = `cs_bypass_${randomUUID()}`;
   const sessionId = searchParams?.session_id ?? (paidBypass ? bypassSessionId : '');
 
-  return <IntakeForm sessionId={sessionId} />;
+  return <IntakeForm sessionId={sessionId} paid={paidBypass} />;
 }
