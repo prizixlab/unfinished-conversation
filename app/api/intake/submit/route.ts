@@ -5,67 +5,75 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const runtime = 'nodejs';
 
-const envTrue = (value?: string) => value?.toLowerCase() === 'true';
-const rawAllowBypass = process.env.ALLOW_BYPASS_PAYMENT;
-const allowBypass =
-  rawAllowBypass === undefined
-    ? process.env.NODE_ENV !== 'production'
-    : envTrue(rawAllowBypass);
-
-console.log('[intake/submit] server start env keys =', Object.keys(process.env));
-console.log(
-  '[intake/submit] bypass config allowBypass =',
-  allowBypass,
-  'raw =',
-  rawAllowBypass,
-  'node_env =',
-  process.env.NODE_ENV
-);
+const isTruthyEnv = (value?: string) => {
+  if (!value) return false;
+  return ['true', '1', 'yes'].includes(value.trim().toLowerCase());
+};
 
 export async function POST(req: Request) {
+  console.log('[INTAKE_SUBMIT_ROUTE_ACTIVE_v1]');
+
+  const rawAllowBypass = process.env.ALLOW_BYPASS_PAYMENT;
+  const isDev = process.env.NODE_ENV !== 'production';
+  const allowBypass = rawAllowBypass === undefined ? isDev : isTruthyEnv(rawAllowBypass);
+
+  console.log('[intake/submit] bypass config', {
+    allowBypass,
+    rawAllowBypass,
+    nodeEnv: process.env.NODE_ENV,
+  });
+
   try {
     const body = (await req.json()) as {
       sessionId?: string;
-      name?: string;
-      recipient?: string;
+      senderName?: string;
+      recipientName?: string;
+      recipientEmail?: string;
       message?: string;
-      email?: string;
     };
 
-    const { sessionId, name, recipient, message, email } = body;
-    const isBypassSession = Boolean(sessionId?.startsWith('cs_bypass_'));
-    const canBypassPayment = allowBypass && isBypassSession;
+    const sessionId = body.sessionId?.trim() ?? '';
+    const senderName = body.senderName?.trim() ?? '';
+    const recipientName = body.recipientName?.trim() ?? '';
+    const recipientEmail = body.recipientEmail?.trim() ?? '';
+    const message = body.message?.trim() ?? '';
 
-    console.log('INTAKE SUBMIT PAYLOAD:', {
+    console.log('[intake/submit] payload diagnostics', {
       sessionId,
-      name,
-      recipient,
-      message,
-      email,
-      bypassMode: canBypassPayment,
+      senderName,
+      recipientName,
+      recipientEmail,
+      messageLen: message.length,
     });
 
-    if (!sessionId || !name || !message || !email) {
+    if (!sessionId || !senderName || !recipientName || !recipientEmail || !message) {
       return NextResponse.json(
-        {
-          error: 'Missing required fields',
-          details: 'sessionId, name, message, and email are required.',
-        },
+        { ok: false, error: 'Missing required fields.' },
         { status: 400 }
       );
     }
 
-    if (!canBypassPayment) {
+    const isBypassSession = sessionId.startsWith('cs_bypass_');
+
+    if (isBypassSession && !allowBypass) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Bypass session is not allowed.',
+          rawEnv: rawAllowBypass,
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!isBypassSession) {
       const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
 
       if (checkoutSession.payment_status !== 'paid') {
         return NextResponse.json(
           {
-            error: 'Payment not verified',
-            details: {
-              payment_status: checkoutSession.payment_status,
-              status: checkoutSession.status,
-            },
+            ok: false,
+            error: 'Payment not verified.',
           },
           { status: 403 }
         );
@@ -76,9 +84,10 @@ export async function POST(req: Request) {
       .from('intake_messages')
       .insert({
         session_id: sessionId,
-        sender_name: name,
-        recipient_name: recipient,
-        recipient_email: email,
+        sender_name: senderName,
+        name: senderName,
+        recipient: recipientName,
+        email: recipientEmail,
         message,
         status: 'pending',
       })
@@ -88,20 +97,20 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json(
         {
-          error: 'Failed to insert intake message',
+          ok: false,
+          error: 'Failed to insert intake message.',
           details: error.message,
         },
         { status: 500 }
       );
     }
 
-    console.log('[intake/submit] SUCCESS id =', data.id);
-
     return NextResponse.json({ ok: true, id: data.id }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json(
       {
-        error: 'Server error',
+        ok: false,
+        error: 'Server error.',
         details: error?.message ?? 'Unexpected error while submitting intake message.',
       },
       { status: 500 }
