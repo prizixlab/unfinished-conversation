@@ -3,7 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-export default function IntakeForm({ sessionId }: { sessionId: string }) {
+export default function IntakeForm({
+  sessionId,
+  paid,
+}: {
+  sessionId: string;
+  paid: boolean;
+}) {
   const [senderName, setSenderName] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -40,7 +46,10 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
     setError(null);
 
     try {
-      const res = await fetch('/api/intake/submit', {
+      console.log('[IntakeForm] submitting payload', payload);
+
+      const endpoint = paid ? '/api/intake/submit?paid=1' : '/api/intake/submit';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
