@@ -17,6 +17,25 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
     e.preventDefault();
     if (ok) return;
 
+    const payload = {
+      sessionId: sessionId.trim(),
+      senderName: senderName.trim(),
+      recipientName: recipientName.trim(),
+      recipientEmail: recipientEmail.trim(),
+      message: message.trim(),
+    };
+
+    if (
+      !payload.sessionId ||
+      !payload.senderName ||
+      !payload.recipientName ||
+      !payload.recipientEmail ||
+      !payload.message
+    ) {
+      setError('Please fill out all fields before sending.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -24,13 +43,7 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
       const res = await fetch('/api/intake/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          name: senderName,
-          recipient: recipientName,
-          message,
-          email: recipientEmail,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -82,6 +95,7 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
             onChange={(e) => setRecipientName(e.target.value)}
             placeholder="A person / Someone I miss / Someone important"
             disabled={isLocked}
+            required
           />
         </div>
 
