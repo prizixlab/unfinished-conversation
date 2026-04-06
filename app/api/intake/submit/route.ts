@@ -9,6 +9,7 @@ import {
   normalizeEmail,
   parseIntakePayload,
   queuePaidSubmission,
+  upsertPaidSubmissionFromStripeSession,
 } from "@/lib/submissions";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +73,24 @@ export async function POST(req: Request) {
       );
     }
 
-    const submission = await getSubmissionByStripeSessionId(stripeSessionId);
+    let submission = await getSubmissionByStripeSessionId(stripeSessionId);
+    if (!submission && !stripeSession.livemode) {
+      try {
+        submission = await upsertPaidSubmissionFromStripeSession(stripeSession);
+        console.info(
+          "Local test fallback created paid submission without webhook",
+          {
+            stripeSessionId,
+          }
+        );
+      } catch (fallbackError) {
+        console.error(
+          "Failed to create paid submission via local test fallback",
+          fallbackError
+        );
+      }
+    }
+
     if (!submission) {
       return NextResponse.json(
         {

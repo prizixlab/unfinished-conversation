@@ -1,5 +1,17 @@
 {
-  "/page": "app/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/request/route": "app/api/request/route.js",
   "/api/checkout/route": "app/api/checkout/route.js",
-  "/start/page": "app/start/page.js"
+  "/api/webhook/route": "app/api/webhook/route.js",
+  "/api/webhook/stripe/route": "app/api/webhook/stripe/route.js",
+  "/faq/page": "app/faq/page.js",
+  "/page": "app/page.js",
+  "/start/page": "app/start/page.js",
+  "/r/[token]/page": "app/r/[token]/page.js",
+  "/api/cron/generate/route": "app/api/cron/generate/route.js",
+  "/api/pdf/[token]/route": "app/api/pdf/[token]/route.js",
+  "/api/intake/submit/route": "app/api/intake/submit/route.js",
+  "/api/ops/submissions/route": "app/api/ops/submissions/route.js",
+  "/intake/page": "app/intake/page.js",
+  "/email/test/route": "app/email/test/route.js"
 }
