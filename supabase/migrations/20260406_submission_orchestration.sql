@@ -310,9 +310,3 @@ begin
   select * from updated;
 end;
 $$;
-
-comment on table public.requests is
-'Canonical one-payment -> one-message -> one-reply submission record for Verba Non Dicta.';
-
-comment on table public.submission_events is
-'Operational audit trail for submission lifecycle transitions and retries.';

@@ -1,99 +1,145 @@
-import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { generateResponse } from '@/lib/openai';
-import { resend } from '@/lib/resend';
+import { NextResponse } from "next/server";
+import { generateResponse } from "@/lib/openai";
+import { resend } from "@/lib/resend";
+import { supabaseAdmin } from "@/lib/supabase";
+import {
+  buildReplyPrompt,
+  buildResultUrl,
+  claimNextSubmissionForDelivery,
+  claimNextSubmissionForGeneration,
+  markDeliveryFailure,
+  markDeliverySuccess,
+  markGenerationFailure,
+  markGenerationSuccess,
+} from "@/lib/submissions";
 
-const delayDefault = Number(process.env.DELAY_MINUTES_DEFAULT ?? '180');
+const BATCH_LIMIT = 5;
 
-function buildPrompt(request: {
-  person_role: string | null;
-  unfinished_summary: string | null;
-  unsaid_message: string | null;
-  relationship_tone: string | null;
-  desired_outcome: string | null;
-  language: string | null;
-}) {
-  return `You are writing a single response that could have been heard. This is not a chat. It is a one-time, complete response.
+function getBearerToken(req: Request) {
+  const auth = req.headers.get("authorization");
+  if (!auth?.startsWith("Bearer ")) {
+    return null;
+  }
 
-Content rules:
-- Do NOT claim real communication with the dead or any supernatural guarantee.
-- Do NOT invent new factual memories or details about the person.
-- Avoid clichés and overly-sappy lines unless the tone strongly calls for it.
-- Tone: calm, adult, restrained, non-urgent.
-- Support closure and reflection, not dependency.
-- Do not encourage repeated use or “come back daily”.
-- Output length: 500–900 words.
-- Write in the same language as the user's input.
-
-Context:
-Person role: ${request.person_role ?? ''}
-What feels unfinished: ${request.unfinished_summary ?? ''}
-What they didn’t say:
-${request.unsaid_message ?? ''}
-Relationship tone: ${request.relationship_tone ?? ''}
-Desired outcome: ${request.desired_outcome ?? ''}
-Detected language: ${request.language ?? 'unknown'}
-
-Write the response now.`;
+  return auth.slice("Bearer ".length);
 }
 
-export async function GET(req: Request) {
-  const auth = req.headers.get('authorization');
-  const secret = process.env.CRON_SECRET;
+async function processGenerationBatch() {
+  let processed = 0;
 
-  if (!secret || auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from('requests')
-    .select(
-      'id, email, token, created_at, delay_minutes, person_role, unfinished_summary, unsaid_message, relationship_tone, desired_outcome, language'
-    )
-    .eq('status', 'pending');
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  const now = Date.now();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
-  const fromEmail = process.env.FROM_EMAIL ?? '';
-
-  for (const request of data ?? []) {
-    const delayMinutes = request.delay_minutes ?? delayDefault;
-    const createdAt = new Date(request.created_at).getTime();
-    if (Number.isNaN(createdAt)) continue;
-    if (now - createdAt < delayMinutes * 60 * 1000) continue;
+  for (let index = 0; index < BATCH_LIMIT; index += 1) {
+    const submission = await claimNextSubmissionForGeneration();
+    if (!submission) {
+      break;
+    }
 
     try {
-      const prompt = buildPrompt(request);
-      const responseText = await generateResponse(prompt);
-      const readyAt = new Date().toISOString();
-
-      await supabaseAdmin
-        .from('requests')
-        .update({ status: 'ready', response_text: responseText, ready_at: readyAt })
-        .eq('id', request.id);
-
-      const link = `${siteUrl}/r/${request.token}`;
-      if (request.email) {
-        await resend.emails.send({
-          from: fromEmail,
-          to: request.email,
-          subject: 'Your text is ready',
-          text: `Your text is ready. Open it when you feel ready: ${link}\n\nIf you don’t see this email, check spam/promotions.`
-        });
+      const replyText = await generateResponse(buildReplyPrompt(submission));
+      if (!replyText) {
+        throw new Error("Model returned an empty reply");
       }
-    } catch (err) {
-      await supabaseAdmin
-        .from('requests')
-        .update({ status: 'failed', error: err instanceof Error ? err.message : 'Unknown error' })
-        .eq('id', request.id);
+
+      await markGenerationSuccess(submission, replyText);
+      processed += 1;
+    } catch (error) {
+      await markGenerationFailure(
+        submission,
+        "generation_error",
+        error instanceof Error ? error.message : "Unknown generation error"
+      );
     }
   }
 
-  return NextResponse.json({ ok: true, processed: data?.length ?? 0 });
+  return processed;
+}
+
+async function processDeliveryBatch() {
+  let processed = 0;
+  const fromEmail = process.env.FROM_EMAIL ?? "";
+  const fromName = process.env.FROM_NAME ?? "Verba Non Dicta";
+
+  if (!fromEmail) {
+    throw new Error("FROM_EMAIL is not configured");
+  }
+
+  for (let index = 0; index < BATCH_LIMIT; index += 1) {
+    const submission = await claimNextSubmissionForDelivery();
+    if (!submission) {
+      break;
+    }
+
+    try {
+      if (!submission.email) {
+        throw new Error("Submission is missing recipient email");
+      }
+
+      const resultUrl = buildResultUrl(submission.token);
+      const resendResponse = await resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: submission.email,
+        subject: "Your private reply is ready",
+        text: `Your private reply is ready.\n\nRead it here: ${resultUrl}\n\nThis link is private. If you do not see the page immediately, try opening the link again in the same browser.`,
+      });
+
+      if ("error" in resendResponse && resendResponse.error) {
+        throw new Error(
+          typeof resendResponse.error.message === "string"
+            ? resendResponse.error.message
+            : "Resend reported a delivery failure"
+        );
+      }
+
+      const providerId =
+        "data" in resendResponse &&
+        resendResponse.data &&
+        typeof resendResponse.data.id === "string"
+          ? resendResponse.data.id
+          : "id" in resendResponse && typeof resendResponse.id === "string"
+            ? resendResponse.id
+          : null;
+
+      await markDeliverySuccess(submission, providerId);
+      processed += 1;
+    } catch (error) {
+      await markDeliveryFailure(
+        submission,
+        "email_error",
+        error instanceof Error ? error.message : "Unknown email error"
+      );
+    }
+  }
+
+  return processed;
+}
+
+export async function GET(req: Request) {
+  const secret = process.env.CRON_SECRET;
+  const bearerToken = getBearerToken(req);
+
+  if (!secret || bearerToken !== secret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const generated = await processGenerationBatch();
+  const delivered = await processDeliveryBatch();
+
+  const stuckThreshold = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const { data: stuckRecords, error: stuckError } = await supabaseAdmin
+    .from('requests')
+    .select('id, stripe_session_id, status, processing_started_at')
+    .in('status', ['generating_reply', 'sending_email'])
+    .lt('processing_started_at', stuckThreshold);
+
+  if (stuckError) {
+    return NextResponse.json({ error: stuckError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    generated,
+    delivered,
+    stuck: stuckRecords ?? [],
+  });
 }
 
 export const dynamic = 'force-dynamic';

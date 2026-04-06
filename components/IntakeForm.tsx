@@ -1,75 +1,71 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useState } from 'react';
+import { useState } from "react";
 
-export default function IntakeForm({ sessionId }: { sessionId: string }) {
-  const [senderName, setSenderName] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [message, setMessage] = useState('');
+type IntakeFormProps = {
+  sessionId: string;
+  paid?: boolean;
+};
+
+export default function IntakeForm({ sessionId }: IntakeFormProps) {
+  const [activeSessionId] = useState(sessionId);
+  const [senderName, setSenderName] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [message, setMessage] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [ok, setOk] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (ok) return;
+    if (submitted || loading) return;
 
-    setLoading(true);
     setError(null);
 
+    setLoading(true);
     try {
-      const res = await fetch('/api/intake/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/intake/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: sessionId,
           senderName,
           recipientName,
           recipientEmail,
           message,
+          sessionId: activeSessionId,
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Failed to submit.');
+      const data = await res.json();
 
-      setOk(true);
-    } catch (err: any) {
-      setError(err?.message || 'Something went wrong.');
+      if (res.ok && data.ok) {
+        setSubmitted(true);
+      } else {
+        setError(data.error || "Failed to send message.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  const isLocked = loading || ok;
+  const disabled = submitted || loading;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10 text-white">
-      <div className="mb-10">
-        <Link
-          href="/start"
-          className="text-sm uppercase tracking-[0.28em] text-white/70 hover:text-white"
-        >
-          Verba Non Dicta
-        </Link>
-      </div>
+    <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+      <form onSubmit={onSubmit} className="space-y-6">
+        <input type="hidden" name="session_id" value={activeSessionId} />
 
-      <h1 className="text-3xl font-semibold">Write your message</h1>
-      <p className="mt-3 text-base text-white/70">
-        Your space is open. Write when you’re ready.
-      </p>
-
-      <form onSubmit={onSubmit} className="mt-8 space-y-5">
         <div>
           <label className="text-sm text-white/80">Your name</label>
           <input
-            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
             value={senderName}
             onChange={(e) => setSenderName(e.target.value)}
-            disabled={isLocked}
+            disabled={disabled}
             required
           />
         </div>
@@ -77,21 +73,22 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
         <div>
           <label className="text-sm text-white/80">This message is for</label>
           <input
-            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
+            placeholder="A person / Someone I miss / Someone important"
             value={recipientName}
             onChange={(e) => setRecipientName(e.target.value)}
-            placeholder="A person / Someone I miss / Someone important"
-            disabled={isLocked}
+            disabled={disabled}
+            required
           />
         </div>
 
         <div>
           <label className="text-sm text-white/80">Your message</label>
           <textarea
-            className="mt-1 min-h-[180px] w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
+            className="mt-1 min-h-[180px] w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={isLocked}
+            disabled={disabled}
             required
           />
         </div>
@@ -101,28 +98,29 @@ export default function IntakeForm({ sessionId }: { sessionId: string }) {
             Your email (where the reply will arrive)
           </label>
           <input
-            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-2 disabled:opacity-60"
             type="email"
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
             value={recipientEmail}
             onChange={(e) => setRecipientEmail(e.target.value)}
-            disabled={isLocked}
+            disabled={disabled}
             required
           />
         </div>
 
         <button
           type="submit"
-          disabled={isLocked}
-          className="glow-hover inline-flex w-full items-center justify-center rounded-full bg-accent px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-accent-text disabled:opacity-60"
+          disabled={disabled}
+          className="w-full rounded-full bg-[#D4AF37] px-5 py-3 font-semibold text-black disabled:opacity-60"
         >
-          {loading ? 'Sending...' : 'Send your message'}
+          {loading ? "Sending..." : "Send your message"}
         </button>
 
-        {ok ? (
-          <p className="text-sm text-green-300">✅ Your words are sent. Wait for the reply.</p>
+        {submitted ? (
+          <p className="text-sm text-white/80">Your words are sent. Watch your email for a private link.</p>
         ) : null}
-        {error ? <p className="text-sm text-red-300">❌ {error}</p> : null}
+
+        {error ? <p className="text-sm text-red-300">{error}</p> : null}
       </form>
-    </main>
+    </div>
   );
 }

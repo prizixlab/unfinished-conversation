@@ -1,19 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSubmissionByToken, RESULT_VISIBLE_STATUSES } from '@/lib/submissions';
 
 export default async function ResultPage({ params }: { params: { token: string } }) {
-  const { data, error } = await supabaseAdmin
-    .from('requests')
-    .select('response_text, status')
-    .eq('token', params.token)
-    .maybeSingle();
+  const data = await getSubmissionByToken(params.token);
 
-  if (error || !data) {
+  if (!data) {
     notFound();
   }
 
-  if (data.status !== 'ready' || !data.response_text) {
+  if (!RESULT_VISIBLE_STATUSES.has(data.status) || !data.reply_text) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Not ready yet</h1>
@@ -29,7 +25,7 @@ export default async function ResultPage({ params }: { params: { token: string }
         <h1 className="font-[var(--font-lora)] text-3xl font-semibold">Read when you feel ready.</h1>
       </div>
       <div className="whitespace-pre-wrap rounded-3xl border border-border bg-surface px-6 py-6 text-sm leading-7 text-text">
-        {data.response_text}
+        {data.reply_text}
       </div>
       <div className="flex flex-col gap-3 md:flex-row">
         <a

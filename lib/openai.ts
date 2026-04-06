@@ -1,4 +1,5 @@
 const openAiKey = process.env.OPENAI_API_KEY;
+const openAiModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 if (!openAiKey) {
   throw new Error('OPENAI_API_KEY is not set');
@@ -12,17 +13,17 @@ export async function generateResponse(prompt: string) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: openAiModel,
       messages: [
         {
           role: 'system',
           content:
-            'You are a calm, restrained writing assistant for a ritual response. Follow the content rules precisely.'
+            'You write one calm, emotionally precise reply in plain text. No therapy framing, no certainty claims, no invitation to continue, no assistant persona, and no bullets unless absolutely necessary.'
         },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.6,
-      max_tokens: 1200
+      temperature: 0.7,
+      max_tokens: 1400
     })
   });
 

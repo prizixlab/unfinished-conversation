@@ -1,10 +1,14 @@
-import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import Stripe from "stripe";
 import { stripe } from '@/lib/stripe';
-import { supabaseAdmin } from '@/lib/supabase';
+import {
+  expireSubmission,
+  getSubmissionByStripeSessionId,
+  upsertPaidSubmissionFromStripeSession,
+} from "@/lib/submissions";
 
 export async function POST(req: Request) {
-  const signature = headers().get('stripe-signature');
+  const signature = req.headers.get('stripe-signature');
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!signature || !webhookSecret) {
@@ -21,12 +25,19 @@ export async function POST(req: Request) {
   }
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session?.id && session.payment_status === "paid") {
+      await upsertPaidSubmissionFromStripeSession(session);
+    }
+  }
+
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
     if (session?.id) {
-      await supabaseAdmin
-        .from('requests')
-        .update({ status: 'pending' })
-        .eq('stripe_session_id', session.id);
+      const submission = await getSubmissionByStripeSessionId(session.id);
+      if (submission && submission.status === "paid" && !submission.is_consumed) {
+        await expireSubmission(submission, "stripe_webhook");
+      }
     }
   }
 
