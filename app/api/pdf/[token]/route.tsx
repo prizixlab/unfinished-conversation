@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { Document, Page, StyleSheet, Text, pdf } from "@react-pdf/renderer";
-import { getSubmissionByToken, RESULT_VISIBLE_STATUSES } from "@/lib/submissions";
+import { supabaseAdmin } from "@/lib/supabase";
+
+const RESULT_VISIBLE_STATUSES = new Set([
+  "reply_generated",
+  "sending_email",
+  "completed",
+  "failed_email",
+]);
 
 const styles = StyleSheet.create({
   page: {
@@ -16,7 +23,15 @@ const styles = StyleSheet.create({
 });
 
 export async function GET(_: Request, { params }: { params: { token: string } }) {
-  const data = await getSubmissionByToken(params.token);
+  const { data, error } = await supabaseAdmin
+    .from("requests")
+    .select("status, reply_text")
+    .eq("token", params.token)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
 
   if (!data || !RESULT_VISIBLE_STATUSES.has(data.status) || !data.reply_text) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
