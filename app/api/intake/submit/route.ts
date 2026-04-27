@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import {
   MAX_REQUEST_BYTES,
-  expireSubmission,
   getSubmissionByStripeSessionId,
-  isExpired,
   isValidEmail,
   normalizeEmail,
   parseIntakePayload,
@@ -13,6 +11,26 @@ import {
 } from "@/lib/submissions";
 
 export const dynamic = "force-dynamic";
+
+function getSafeErrorInfo(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return {
+      code: "unknown",
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const maybeError = error as { code?: unknown; message?: unknown };
+  return {
+    code: typeof maybeError.code === "string" ? maybeError.code : "unknown",
+    message:
+      typeof maybeError.message === "string"
+        ? maybeError.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown error",
+  };
+}
 
 export async function POST(req: Request) {
   const contentLength = Number(req.headers.get("content-length") || "0");
@@ -35,6 +53,10 @@ export async function POST(req: Request) {
 
   const { senderName, recipientName, email, messageText, stripeSessionId, messageLanguage } =
     parseIntakePayload(body);
+
+  console.info("Intake submit route reached", {
+    sessionIdPresent: Boolean(stripeSessionId),
+  });
 
   const missing: string[] = [];
   if (!senderName) missing.push("senderName");
@@ -74,18 +96,24 @@ export async function POST(req: Request) {
     }
 
     let submission = await getSubmissionByStripeSessionId(stripeSessionId);
-    if (!submission && !stripeSession.livemode) {
+    console.info("Intake submit payment row lookup", {
+      sessionIdPresent: Boolean(stripeSessionId),
+      paymentRowFound: Boolean(submission),
+    });
+
+    if (!submission) {
       try {
         submission = await upsertPaidSubmissionFromStripeSession(stripeSession);
         console.info(
-          "Local test fallback created paid submission without webhook",
+          "Intake created paid submission before queueing",
           {
             stripeSessionId,
+            livemode: stripeSession.livemode,
           }
         );
       } catch (fallbackError) {
         console.error(
-          "Failed to create paid submission via local test fallback",
+          "Failed to create paid submission during intake",
           fallbackError
         );
       }
@@ -101,10 +129,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (submission.status === "expired" || isExpired(submission.session_expires_at)) {
-      if (submission.status === "paid") {
-        await expireSubmission(submission);
-      }
+    if (submission.status === "expired") {
       return NextResponse.json(
         { ok: false, error: "This intake link has expired." },
         { status: 410 }
@@ -118,14 +143,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const queued = await queuePaidSubmission({
-      submission,
-      email: normalizeEmail(email),
-      senderName,
-      recipientName,
-      messageText,
-      messageLanguage,
-    });
+    let queued;
+    try {
+      queued = await queuePaidSubmission({
+        submission,
+        email: normalizeEmail(email),
+        senderName,
+        recipientName,
+        messageText,
+        messageLanguage,
+      });
+    } catch (error) {
+      const safeError = getSafeErrorInfo(error);
+      console.error("Intake submit queue failed", {
+        sessionIdPresent: Boolean(stripeSessionId),
+        paymentRowFound: Boolean(submission),
+        insertErrorCode: safeError.code,
+        insertErrorMessage: safeError.message,
+      });
+      throw error;
+    }
 
     return NextResponse.json(
       {
@@ -137,7 +174,12 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Failed to submit intake", error);
+    const safeError = getSafeErrorInfo(error);
+    console.error("Failed to submit intake", {
+      sessionIdPresent: Boolean(stripeSessionId),
+      insertErrorCode: safeError.code,
+      insertErrorMessage: safeError.message,
+    });
     return NextResponse.json(
       { ok: false, error: "Failed to submit intake" },
       { status: 500 }
