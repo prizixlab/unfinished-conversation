@@ -222,6 +222,7 @@ export function parseIntakePayload(body: any) {
   const email = normalizeEmail(body?.recipientEmail);
   const messageText = sanitizeMessage(body?.message);
   const stripeSessionId = trimmed(body?.sessionId);
+  const explicitLanguage = sanitizeSingleLine(body?.messageLanguage, MAX_NAME_LENGTH);
 
   return {
     senderName,
@@ -229,7 +230,8 @@ export function parseIntakePayload(body: any) {
     email,
     messageText,
     stripeSessionId,
-    messageLanguage: messageText ? detectLanguage(messageText) : null,
+    messageLanguage:
+      explicitLanguage || (messageText ? detectLanguage(messageText) : null) || "English",
   };
 }
 
@@ -294,6 +296,7 @@ export async function claimNextSubmissionForGeneration() {
   }
 
   const row = Array.isArray(data) && data.length > 0 ? (data[0] as SubmissionRow) : null;
+
   if (row) {
     await logSubmissionEvent({
       submissionId: row.id,

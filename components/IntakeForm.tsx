@@ -13,6 +13,7 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [messageLanguage, setMessageLanguage] = useState("English");
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -35,6 +36,7 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
           recipientEmail,
           message,
           sessionId: activeSessionId,
+          messageLanguage,
         }),
       });
 
@@ -80,6 +82,23 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
             disabled={disabled}
             required
           />
+        </div>
+
+        <div>
+          <label className="text-sm text-white/80">Message language</label>
+          <select
+            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
+            value={messageLanguage}
+            onChange={(e) => setMessageLanguage(e.target.value)}
+            disabled={disabled}
+          >
+            <option value="English">English</option>
+            <option value="German">German</option>
+            <option value="Spanish">Spanish</option>
+            <option value="French">French</option>
+            <option value="Italian">Italian</option>
+            <option value="Portuguese">Portuguese</option>
+          </select>
         </div>
 
         <div>
