@@ -104,13 +104,10 @@ export async function POST(req: Request) {
     if (!submission) {
       try {
         submission = await upsertPaidSubmissionFromStripeSession(stripeSession);
-        console.info(
-          "Intake created paid submission before queueing",
-          {
-            stripeSessionId,
-            livemode: stripeSession.livemode,
-          }
-        );
+        console.info("Intake created paid submission before queueing", {
+          stripeSessionId,
+          livemode: stripeSession.livemode,
+        });
       } catch (fallbackError) {
         console.error(
           "Failed to create paid submission during intake",

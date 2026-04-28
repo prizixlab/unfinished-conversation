@@ -45,7 +45,7 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
       } else {
         setError(data.error || "Failed to send message.");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
