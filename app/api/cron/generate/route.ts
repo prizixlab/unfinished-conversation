@@ -13,6 +13,9 @@ import {
   markGenerationSuccess,
 } from "@/lib/submissions";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const BATCH_LIMIT = 5;
 
 function getBearerToken(req: Request) {
@@ -113,6 +116,8 @@ async function processDeliveryBatch() {
 }
 
 export async function GET(req: Request) {
+  console.log("CRON HIT");
+
   const secret = process.env.CRON_SECRET;
   const bearerToken = getBearerToken(req);
 
@@ -141,5 +146,3 @@ export async function GET(req: Request) {
     stuck: stuckRecords ?? [],
   });
 }
-
-export const dynamic = 'force-dynamic';
