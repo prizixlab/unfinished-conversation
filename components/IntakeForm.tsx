@@ -13,7 +13,6 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
-  const [messageLanguage, setMessageLanguage] = useState("English");
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -36,7 +35,6 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
           recipientEmail,
           message,
           sessionId: activeSessionId,
-          messageLanguage,
         }),
       });
 
@@ -62,7 +60,9 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
         <input type="hidden" name="session_id" value={activeSessionId} />
 
         <div>
-          <label className="text-sm text-white/80">Your name</label>
+          <label className="text-sm text-white/80">
+            How should the reply address you?
+          </label>
           <input
             className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
             value={senderName}
@@ -70,6 +70,9 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
             disabled={disabled}
             required
           />
+          <p className="mt-2 text-xs text-white/60">
+            Use your first name, nickname, or the name they would have used for you.
+          </p>
         </div>
 
         <div>
@@ -85,24 +88,10 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
         </div>
 
         <div>
-          <label className="text-sm text-white/80">Message language</label>
-          <select
-            className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
-            value={messageLanguage}
-            onChange={(e) => setMessageLanguage(e.target.value)}
-            disabled={disabled}
-          >
-            <option value="English">English</option>
-            <option value="German">German</option>
-            <option value="Spanish">Spanish</option>
-            <option value="French">French</option>
-            <option value="Italian">Italian</option>
-            <option value="Portuguese">Portuguese</option>
-          </select>
-        </div>
-
-        <div>
           <label className="text-sm text-white/80">Your message</label>
+          <p className="mt-2 text-xs text-white/60">
+            Write in any language that feels natural.
+          </p>
           <textarea
             className="mt-1 min-h-[180px] w-full rounded-lg bg-white/10 px-3 py-2 outline-none ring-1 ring-white/15 focus:ring-white/30"
             value={message}
@@ -135,7 +124,11 @@ export default function IntakeForm({ sessionId }: IntakeFormProps) {
         </button>
 
         {submitted ? (
-          <p className="text-sm text-white/80">Your words are sent. Watch your email for a private link.</p>
+          <p className="text-sm text-white/80">
+            Your words are sent. Watch your email for a private link. If it does
+            not arrive within a few minutes, check your spam or promotions folder
+            and mark the message as ‘Not spam.’
+          </p>
         ) : null}
 
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
