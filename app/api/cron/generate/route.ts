@@ -59,7 +59,7 @@ async function processGenerationBatch() {
 async function processDeliveryBatch() {
   let processed = 0;
   const fromEmail = process.env.FROM_EMAIL ?? "";
-  const fromName = process.env.FROM_NAME ?? "Verba Non Dicta";
+  const fromName = "Verba Non Dicta";
 
   if (!fromEmail) {
     throw new Error("FROM_EMAIL is not configured");
@@ -80,8 +80,8 @@ async function processDeliveryBatch() {
       const resendResponse = await resend.emails.send({
         from: `${fromName} <${fromEmail}>`,
         to: submission.email,
-        subject: "Your private reply is ready",
-        text: `Your private reply is ready.\n\nRead it here: ${resultUrl}\n\nThis link is private. If you do not see the page immediately, try opening the link again in the same browser.`,
+        subject: "Your letter is ready",
+        text: `Your letter is ready.\n\nRead it here:\n${resultUrl}\n\nIf you do not see future emails from Verba Non Dicta, check your spam or promotions folder and mark the message as “Not spam.”\n\n— Verba Non Dicta`,
       });
 
       if ("error" in resendResponse && resendResponse.error) {
